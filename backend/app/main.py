@@ -12,11 +12,18 @@ from .services.pdf_extractor import extract_pages,make_chunks
 from .services.ai_generator import generate_from_text
 from .services.paper_builder import create_sets,validate
 from .services.pdf_generator import render_pdf
+from fastapi.responses import FileResponse
 app=FastAPI(title='Offline Smart Question Paper Generator',version='1.1.0')
 app.add_middleware(CORSMiddleware,allow_origins=[x.strip() for x in settings.cors_origins.split(',')],allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
 UPLOADS=Path('uploads');UPLOADS.mkdir(exist_ok=True);init_db()
-@app.get('/')
-async def root():return {'message':'Offline Smart Question Paper Generator API is running'}
+@app.get("/")
+async def root():
+    index_file = FRONTEND_DIST / "index.html"
+
+    if index_file.exists():
+        return FileResponse(index_file)
+
+    return {"message": "Offline Smart Question Paper Generator API is running"}
 @app.post('/api/documents/upload')
 async def upload(file:UploadFile=File(...)):
     if not file.filename.lower().endswith('.pdf'):raise HTTPException(400,'Only PDF files are accepted.')
@@ -63,3 +70,28 @@ async def download(paper_id:str,set_name:str,answer_key:bool=False):
     return StreamingResponse(BytesIO(pdf),media_type='application/pdf',headers={'Content-Disposition':f'attachment; filename="{kind}-set-{set_name.upper()}.pdf"'})
 @app.get('/api/dashboard/stats')
 async def stats():return counts()
+
+
+# Serve React frontend
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    if not FRONTEND_DIST.exists():
+        raise HTTPException(404, "Frontend build not found")
+
+    requested_file = (FRONTEND_DIST / full_path).resolve()
+
+    if requested_file.is_relative_to(FRONTEND_DIST.resolve()) and requested_file.is_file():
+        return FileResponse(requested_file)
+
+    index_file = FRONTEND_DIST / "index.html"
+
+    if index_file.exists():
+        return FileResponse(index_file)
+
+    raise HTTPException(404, "Page not found")
