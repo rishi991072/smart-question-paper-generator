@@ -15,7 +15,11 @@ from .services.pdf_generator import render_pdf
 from fastapi.responses import FileResponse
 app=FastAPI(title='Offline Smart Question Paper Generator',version='1.1.0')
 app.add_middleware(CORSMiddleware,allow_origins=[x.strip() for x in settings.cors_origins.split(',')],allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
-UPLOADS=Path('uploads');UPLOADS.mkdir(exist_ok=True);init_db()
+import os
+
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parents[1])))
+UPLOADS = DATA_DIR / "uploads"
+UPLOADS.mkdir(parents=True, exist_ok=True);init_db()
 @app.get("/")
 async def root():
     index_file = FRONTEND_DIST / "index.html"
